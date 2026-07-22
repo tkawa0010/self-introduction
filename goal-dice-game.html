@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>『ザ・ゴール』サイコロゲーム シミュレータ</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --bg: #f4f6fb;
+    --panel: #ffffff;
+    --text: #1e2230;
+    --muted: #6b7280;
+    --border: #e2e5ec;
+    --accent: #4f46e5;
+    --accent-soft: #eef0fe;
+    --good: #059669;
+    --bad: #dc2626;
+    --shadow: 0 1px 3px rgba(20,20,40,0.08), 0 1px 2px rgba(20,20,40,0.06);
+    --s0: #4f46e5;
+    --s1: #0891b2;
+    --s2: #d97706;
+    --s3: #dc2626;
+    --s4: #7c3aed;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg: #14151c;
+      --panel: #1d1f29;
+      --text: #edeef2;
+      --muted: #9aa0ad;
+      --border: #2c2f3a;
+      --accent: #818cf8;
+      --accent-soft: #262a45;
+      --good: #34d399;
+      --bad: #f87171;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family: "Hiragino Kaku Gothic ProN","Yu Gothic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  #root{ max-width: 1180px; margin: 0 auto; padding: 12px 12px 60px; }
+  h1{ font-size: 1.3rem; margin: 8px 0 2px; }
+  h2{ font-size: 1.02rem; margin: 0 0 10px; }
+  .subtitle{ color: var(--muted); font-size: 0.82rem; margin: 0 0 16px; line-height:1.5; }
+  .panel{ background: var(--panel); border:1px solid var(--border); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .btn{ appearance:none; border:1px solid var(--border); background: var(--panel); color:var(--text);
+    padding: 9px 14px; border-radius: 10px; font-size: 0.85rem; cursor:pointer; font-weight:600;
+    transition: transform .05s ease, background .15s ease; white-space:nowrap; }
+  .btn:hover{ background: var(--accent-soft); }
+  .btn:active{ transform: scale(0.97); }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .btn.primary{ background: var(--accent); color:white; border-color: var(--accent); }
+  .btn.primary:hover{ filter:brightness(1.05); }
+  .btn.ghost{ background:transparent; }
+  .btn.small{ padding:5px 10px; font-size:0.74rem; }
+  .pill{ display:inline-flex; align-items:center; gap:6px; background: var(--accent-soft);
+    color: var(--accent); padding: 5px 12px; border-radius: 999px; font-size:0.78rem; font-weight:700; }
+  .status-grid{ display:grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-top:12px; }
+  .stat{ background: var(--bg); border:1px solid var(--border); border-radius:10px; padding:8px 10px; }
+  .stat .label{ font-size:0.68rem; color:var(--muted); margin-bottom:2px; }
+  .stat .value{ font-size:1.15rem; font-weight:800; }
+  .stat .value.small{ font-size: 0.95rem; }
+  .progress-bar{ height:8px; border-radius:6px; background:var(--border); overflow:hidden; margin-top:6px; }
+  .progress-bar > div{ height:100%; border-radius:6px; transition: width .3s ease; }
+
+  .line{ display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; position:relative; }
+  @media (max-width: 760px){ .line{ grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 420px){ .line{ grid-template-columns: 1fr; } }
+
+  .station{ background: var(--bg); border:1px solid var(--border); border-radius:12px; padding:10px; position:relative; overflow:hidden; }
+  .station .head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .station .name{ font-weight:800; font-size:0.86rem; }
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:5px; }
+  .dice{ width:40px; height:40px; border-radius:9px; border:2px solid var(--border); background:var(--panel);
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; margin: 4px 0 8px; }
+  .dice.rolling{ animation: spin 0.12s linear infinite; }
+  @keyframes spin{ 0%{ transform: rotate(-4deg) scale(1.03);} 50%{ transform: rotate(4deg) scale(0.97);} 100%{ transform: rotate(-4deg) scale(1.03);} }
+  .pile{ display:flex; flex-wrap:wrap; gap:2px; min-height: 46px; align-content:flex-start; margin-bottom:6px; }
+  .chip{ width:9px; height:9px; border-radius:3px; }
+  .pile-overflow{ font-size:0.7rem; color:var(--muted); align-self:center; }
+  .infinity-badge{ display:flex; align-items:center; justify-content:center; height:46px; font-size:1.5rem;
+    color: var(--muted); margin-bottom:6px; }
+  .wipnum{ font-weight:800; font-size:1rem; }
+  .note{ font-size:0.66rem; color:var(--muted); line-height:1.4; margin-top:2px; }
+  .metrics{ margin-top:6px; display:flex; flex-direction:column; gap:2px; }
+  .metrics .m{ display:flex; justify-content:space-between; font-size:0.68rem; color:var(--muted); }
+  .metrics .m b{ color:var(--text); font-weight:700; }
+  .flow-badge{ position:absolute; top:2px; right:6px; font-size:0.65rem; font-weight:800; color: var(--good);
+    animation: floatup 0.9s ease forwards; pointer-events:none; }
+  @keyframes floatup{ 0%{ opacity:0; transform: translateY(4px);} 20%{ opacity:1; transform: translateY(0);} 100%{ opacity:0; transform: translateY(-14px);} }
+
+  .edit-grid{ display:grid; grid-template-columns: 70px repeat(6, 46px); gap:6px; align-items:center; margin-top:6px; }
+  .edit-grid input{ width:100%; padding:4px; border-radius:6px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:0.78rem; text-align:center; }
+  .edit-label{ font-size:0.72rem; color:var(--muted); }
+
+  table{ border-collapse: collapse; width:100%; font-size:0.76rem; }
+  thead th{ position:sticky; top:0; background:var(--panel); }
+  th, td{ border-bottom:1px solid var(--border); padding:5px 8px; text-align:center; white-space:nowrap; }
+  .table-scroll{ max-height: 280px; overflow:auto; border:1px solid var(--border); border-radius:10px; }
+  .achieve{ font-weight:800; }
+  .achieve.ok{ color: var(--good); }
+  .achieve.ng{ color: var(--bad); }
+
+  .presets{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .legend{ display:flex; flex-wrap:wrap; gap:10px; margin-top:6px; font-size:0.72rem; color:var(--muted); }
+  .legend span{ display:inline-flex; align-items:center; gap:4px; }
+  .chart-wrap{ overflow-x:auto; }
+  svg.chart{ width:100%; min-width:480px; height:auto; display:block; }
+  .close-x{ cursor:pointer; color:var(--muted); font-weight:800; border:none; background:none; font-size:0.9rem; }
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+  @media (max-width: 760px){ .grid2{ grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useMemo, useCallback } = React;
+
+const STATION_COUNT = 5;
+const STATION_COLORS = ['#4f46e5', '#0891b2', '#d97706', '#dc2626', '#7c3aed'];
+const STATION_NAMES = ['工程1', '工程2', '工程3', '工程4', '工程5'];
+const TARGET_PER_10 = 35;
+
+function defaultStation(){ return { initialWip: 4, faces: [1,2,3,4,5,6] }; }
+function defaultStations(){ return Array.from({ length: STATION_COUNT }, defaultStation); }
+
+const PRESETS = [
+  {
+    key: 'standard', label: '① 標準（全員1-6）',
+    build: () => Array.from({ length: STATION_COUNT }, () => ({ initialWip: 4, faces: [1,2,3,4,5,6] })),
+  },
+  {
+    key: 'bottleneck', label: '② ボトルネックあり（工程3だけ1-3）',
+    build: () => [0,1,2,3,4].map(i => i === 2
+      ? { initialWip: 4, faces: [1,1,2,2,3,3] }
+      : { initialWip: 4, faces: [1,2,3,4,5,6] }),
+  },
+  {
+    key: 'lowvar', label: '③ ばらつき削減（全員3,3,4,4,3,4）',
+    build: () => Array.from({ length: STATION_COUNT }, () => ({ initialWip: 4, faces: [3,3,4,4,3,4] })),
+  },
+  {
+    key: 'dbr', label: '④ DBR風（工程3がボトルネック／その手前は厚めバッファ）',
+    build: () => [0,1,2,3,4].map(i => {
+      if (i === 2) return { initialWip: 4, faces: [1,1,2,2,3,3] };
+      if (i === 1) return { initialWip: 12, faces: [1,2,3,4,5,6] };
+      return { initialWip: 4, faces: [1,2,3,4,5,6] };
+    }),
+  },
+];
+
+function simulateRounds(state, stations, n) {
+  let wip = [...state.wip];
+  let cumProcessed = [...state.cumProcessed];
+  let cumRoll = [...state.cumRoll];
+  let round = state.round;
+  const newHistory = [];
+  let lastRolls = state.lastRolls;
+  let lastProcessed = state.lastProcessed;
+
+  for (let k = 0; k < n; k++) {
+    const rolls = stations.map(s => s.faces[Math.floor(Math.random() * 6)]);
+    const processed = new Array(STATION_COUNT).fill(0);
+    for (let i = 0; i < STATION_COUNT; i++) {
+      processed[i] = i === 0 ? rolls[i] : Math.min(rolls[i], wip[i]);
+    }
+    const newWip = [...wip];
+    for (let i = 0; i < STATION_COUNT; i++) {
+      newWip[i] = i === 0 ? wip[i] : wip[i] - processed[i] + processed[i - 1];
+    }
+    wip = newWip;
+    for (let i = 0; i < STATION_COUNT; i++) { cumProcessed[i] += processed[i]; cumRoll[i] += rolls[i]; }
+    round += 1;
+    newHistory.push({ round, rolls, processed, completed: processed[STATION_COUNT - 1], wipAfter: [...wip] });
+    lastRolls = rolls; lastProcessed = processed;
+  }
+  return { wip, cumProcessed, cumRoll, round, newHistory, lastRolls, lastProcessed };
+}
+
+function ChipPile({ count, color }) {
+  const MAX = 24;
+  const shown = Math.max(0, Math.min(count, MAX));
+  const extra = count - shown;
+  return (
+    <div className="pile">
+      {Array.from({ length: shown }).map((_, i) => (
+        <div className="chip" key={i} style={{ background: color }} />
+      ))}
+      {extra > 0 && <div className="pile-overflow">+{extra}</div>}
+    </div>
+  );
+}
+
+function LineChart({ series, width = 560, height = 200, maxYOverride }) {
+  const pad = { l: 34, r: 10, t: 10, b: 22 };
+  const allX = series.flatMap(s => s.data.map(p => p.x));
+  const allY = series.flatMap(s => s.data.map(p => p.y));
+  const maxX = Math.max(1, ...allX);
+  const maxY = maxYOverride != null ? maxYOverride : Math.max(1, ...allY);
+  const innerW = width - pad.l - pad.r;
+  const innerH = height - pad.t - pad.b;
+  const sx = x => pad.l + (maxX === 0 ? 0 : (x / maxX) * innerW);
+  const sy = y => pad.t + innerH - (maxY === 0 ? 0 : (y / maxY) * innerH);
+
+  return (
+    <div className="chart-wrap">
+      <svg className="chart" viewBox={`0 0 ${width} ${height}`}>
+        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={pad.t + innerH} stroke="var(--border)" />
+        <line x1={pad.l} y1={pad.t + innerH} x2={pad.l + innerW} y2={pad.t + innerH} stroke="var(--border)" />
+        <text x={2} y={pad.t + 4} fontSize="9" fill="var(--muted)">{Math.round(maxY)}</text>
+        <text x={2} y={pad.t + innerH} fontSize="9" fill="var(--muted)">0</text>
+        <text x={pad.l + innerW - 4} y={height - 4} fontSize="9" fill="var(--muted)" textAnchor="end">R{Math.round(maxX)}</text>
+        {series.map((s, si) => {
+          if (s.data.length === 0) return null;
+          const pts = s.data.map(p => `${sx(p.x)},${sy(p.y)}`).join(' ');
+          return (
+            <polyline key={si} points={pts} fill="none" stroke={s.color}
+              strokeWidth={s.dash ? 1.5 : 2.2} strokeDasharray={s.dash ? '4 3' : undefined} />
+          );
+        })}
+      </svg>
+      <div className="legend">
+        {series.map((s, si) => (
+          <span key={si}><span className="dot" style={{ background: s.color }}></span>{s.name}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StationCard({ idx, config, wip, lastRoll, lastProcessed, cumProcessed, cumRoll, round,
+  editMode, onWipChange, onFaceChange, rolling, animRoll, flowFlash }) {
+  const color = STATION_COLORS[idx];
+  const efficiency = cumRoll > 0 ? (cumProcessed / cumRoll) * 100 : 0;
+  const productivity = round > 0 ? cumProcessed / round : 0;
+  const displayRoll = rolling ? animRoll : lastRoll;
+
+  return (
+    <div className="station">
+      <div className="head">
+        <div className="name"><span className="dot" style={{ background: color }}></span>{STATION_NAMES[idx]}</div>
+        {lastProcessed != null && !rolling && (
+          <div className="flow-badge" key={flowFlash}>+{lastProcessed}</div>
+        )}
+      </div>
+
+      <div className={"dice" + (rolling ? " rolling" : "")} style={{ borderColor: color }}>
+        {displayRoll == null ? '—' : displayRoll}
+      </div>
+
+      {idx === 0 ? (
+        <>
+          <div className="infinity-badge">∞</div>
+          <div className="note">原材料は無限のため、出目がそのまま処理数になります</div>
+        </>
+      ) : (
+        <>
+          <ChipPile count={wip} color={color} />
+          <div className="wipnum">WIP: {wip}</div>
+        </>
+      )}
+
+      <div className="metrics">
+        {idx !== 0 && <div className="m"><span>現在WIP</span><b>{wip}</b></div>}
+        <div className="m"><span>スループット</span><b>{cumProcessed}</b></div>
+        <div className="m"><span>効率</span><b>{efficiency.toFixed(1)}%</b></div>
+        <div className="m"><span>生産性/R</span><b>{productivity.toFixed(2)}</b></div>
+      </div>
+
+      {editMode && (
+        <div style={{ marginTop: 8, borderTop: '1px dashed var(--border)', paddingTop: 6 }}>
+          {idx !== 0 && (
+            <div className="edit-label">
+              初期WIP:{' '}
+              <input type="number" min="0" value={config.initialWip}
+                style={{ width: 54 }}
+                onChange={e => onWipChange(idx, Math.max(0, parseInt(e.target.value || '0', 10)))} />
+            </div>
+          )}
+          <div className="edit-label" style={{ marginTop: 4 }}>サイコロの目（1〜6面目）</div>
+          <div className="edit-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+            {config.faces.map((f, fi) => (
+              <input key={fi} type="number" min="0" value={f}
+                onChange={e => onFaceChange(idx, fi, Math.max(0, parseInt(e.target.value || '0', 10)))} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [stations, setStations] = useState(defaultStations());
+  const [round, setRound] = useState(0);
+  const [wip, setWip] = useState(() => stations.map(s => s.initialWip));
+  const [cumProcessed, setCumProcessed] = useState(() => Array(STATION_COUNT).fill(0));
+  const [cumRoll, setCumRoll] = useState(() => Array(STATION_COUNT).fill(0));
+  const [history, setHistory] = useState([]);
+  const [lastRolls, setLastRolls] = useState(Array(STATION_COUNT).fill(null));
+  const [lastProcessed, setLastProcessed] = useState(Array(STATION_COUNT).fill(null));
+  const [editMode, setEditMode] = useState(false);
+  const [previousRun, setPreviousRun] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [animRolls, setAnimRolls] = useState(null);
+  const [flowFlash, setFlowFlash] = useState(0);
+  const spinTimer = useRef(null);
+  const spinTimeout = useRef(null);
+
+  const currentStateRef = useRef();
+  currentStateRef.current = { wip, cumProcessed, cumRoll, round, lastRolls, lastProcessed };
+
+  const applyResult = useCallback((result) => {
+    setWip(result.wip);
+    setCumProcessed(result.cumProcessed);
+    setCumRoll(result.cumRoll);
+    setRound(result.round);
+    setHistory(h => [...h, ...result.newHistory]);
+    setLastRolls(result.lastRolls);
+    setLastProcessed(result.lastProcessed);
+  }, []);
+
+  const handleRollOnce = useCallback(() => {
+    if (busy) return;
+    setBusy(true);
+    let ticks = 0;
+    spinTimer.current = setInterval(() => {
+      setAnimRolls(stations.map(s => s.faces[Math.floor(Math.random() * 6)]));
+      ticks++;
+      if (ticks > 8 && spinTimer.current) { clearInterval(spinTimer.current); }
+    }, 60);
+    spinTimeout.current = setTimeout(() => {
+      if (spinTimer.current) clearInterval(spinTimer.current);
+      const result = simulateRounds(currentStateRef.current, stations, 1);
+      applyResult(result);
+      setAnimRolls(null);
+      setFlowFlash(k => k + 1);
+      setBusy(false);
+    }, 520);
+  }, [busy, stations, applyResult]);
+
+  const handleRollTo10 = useCallback(() => {
+    if (busy) return;
+    const target = (Math.floor(round / 10) + 1) * 10;
+    const n = target - round;
+    const result = simulateRounds(currentStateRef.current, stations, n);
+    applyResult(result);
+    setFlowFlash(k => k + 1);
+  }, [busy, round, stations, applyResult]);
+
+  const saveSummaryIfNeeded = useCallback(() => {
+    const s = currentStateRef.current;
+    if (s.round > 0) {
+      setPreviousRun({
+        round: s.round,
+        cumProcessed: [...s.cumProcessed],
+        cumRoll: [...s.cumRoll],
+        completedTotal: s.cumProcessed[STATION_COUNT - 1],
+      });
+    }
+  }, []);
+
+  const handleReset = useCallback(() => {
+    saveSummaryIfNeeded();
+    setRound(0);
+    setWip(stations.map(s => s.initialWip));
+    setCumProcessed(Array(STATION_COUNT).fill(0));
+    setCumRoll(Array(STATION_COUNT).fill(0));
+    setHistory([]);
+    setLastRolls(Array(STATION_COUNT).fill(null));
+    setLastProcessed(Array(STATION_COUNT).fill(null));
+    setAnimRolls(null);
+  }, [stations, saveSummaryIfNeeded]);
+
+  const applyPreset = useCallback((key) => {
+    const preset = PRESETS.find(p => p.key === key);
+    if (!preset) return;
+    const cfg = preset.build();
+    saveSummaryIfNeeded();
+    setStations(cfg);
+    setRound(0);
+    setWip(cfg.map(s => s.initialWip));
+    setCumProcessed(Array(STATION_COUNT).fill(0));
+    setCumRoll(Array(STATION_COUNT).fill(0));
+    setHistory([]);
+    setLastRolls(Array(STATION_COUNT).fill(null));
+    setLastProcessed(Array(STATION_COUNT).fill(null));
+    setAnimRolls(null);
+  }, [saveSummaryIfNeeded]);
+
+  const updateWip = useCallback((idx, value) => {
+    setStations(prev => prev.map((s, i) => i === idx ? { ...s, initialWip: value } : s));
+  }, []);
+  const updateFace = useCallback((idx, faceIdx, value) => {
+    setStations(prev => prev.map((s, i) => i === idx
+      ? { ...s, faces: s.faces.map((f, j) => j === faceIdx ? value : f) }
+      : s));
+  }, []);
+
+  const last10Completed = useMemo(() => history.slice(-10).reduce((a, h) => a + h.completed, 0), [history]);
+  const totalWip = useMemo(() => wip.reduce((a, v, i) => i === 0 ? a : a + v, 0), [wip]);
+  const completedTotal = cumProcessed[STATION_COUNT - 1];
+
+  const decadeBlocks = useMemo(() => {
+    const blocks = [];
+    for (let i = 0; i < history.length; i += 10) {
+      const slice = history.slice(i, i + 10);
+      if (slice.length === 0) continue;
+      const sum = slice.reduce((a, h) => a + h.completed, 0);
+      blocks.push({ from: slice[0].round, to: slice[slice.length - 1].round, sum, full: slice.length === 10 });
+    }
+    return blocks;
+  }, [history]);
+
+  const cumulativeSeries = useMemo(() => {
+    let acc = 0;
+    const data = history.map(h => { acc += h.completed; return { x: h.round, y: acc }; });
+    const targetData = history.map(h => ({ x: h.round, y: h.round * (TARGET_PER_10 / 10) }));
+    return [
+      { name: '完成品累計', color: '#4f46e5', data },
+      { name: '目標ペース(3.5/R)', color: '#9ca3af', dash: true, data: targetData },
+    ];
+  }, [history]);
+
+  const wipSeries = useMemo(() => {
+    return [1,2,3,4].map(i => ({
+      name: STATION_NAMES[i],
+      color: STATION_COLORS[i],
+      data: history.map(h => ({ x: h.round, y: h.wipAfter[i] })),
+    }));
+  }, [history]);
+
+  const nextTarget = (Math.floor(round / 10) + 1) * 10;
+
+  return (
+    <div>
+      <h1>『ザ・ゴール』サイコロゲーム シミュレータ</h1>
+      <p className="subtitle">
+        5つの工程を直列に並べ、毎ラウンド全員が同時にサイコロを振ります。各工程は「出目」と「手元WIP」の小さい方だけ次工程に渡せます。
+        上流から渡されたチップは<b>そのラウンドでは処理できず、次のラウンドから処理対象</b>になります（依存的事象の再現）。
+        10ラウンドごとに完成品35個（出目平均3.5×10）を目指しましょう。
+      </p>
+
+      <div className="panel">
+        <div className="row">
+          <button className="btn primary" onClick={handleRollOnce} disabled={busy}>🎲 1ラウンド振る</button>
+          <button className="btn" onClick={handleRollTo10} disabled={busy}>⏩ {nextTarget}ラウンドまで振る</button>
+          <button className="btn ghost" onClick={handleReset} disabled={busy}>↺ リセット</button>
+          <button className={"btn" + (editMode ? " primary" : "")} onClick={() => setEditMode(e => !e)}>
+            ⚙ {editMode ? '編集モード終了' : '編集モード'}
+          </button>
+          <span className="pill">ラウンド {round}</span>
+        </div>
+
+        <div className="presets">
+          {PRESETS.map(p => (
+            <button key={p.key} className="btn small" onClick={() => applyPreset(p.key)}>{p.label}</button>
+          ))}
+        </div>
+
+        <div className="status-grid">
+          <div className="stat">
+            <div className="label">完成品累計</div>
+            <div className="value">{completedTotal}</div>
+          </div>
+          <div className="stat">
+            <div className="label">直近10ラウンドの完成品数（目標{TARGET_PER_10}）</div>
+            <div className="value">{last10Completed} <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>/ {TARGET_PER_10}</span></div>
+            <div className="progress-bar">
+              <div style={{
+                width: Math.min(100, (last10Completed / TARGET_PER_10) * 100) + '%',
+                background: last10Completed >= TARGET_PER_10 ? 'var(--good)' : 'var(--bad)',
+              }} />
+            </div>
+          </div>
+          <div className="stat">
+            <div className="label">ライン全体WIP合計（工程2〜5）</div>
+            <div className="value">{totalWip}</div>
+          </div>
+        </div>
+      </div>
+
+      {previousRun && (
+        <div className="panel">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h2 style={{ margin: 0 }}>前回実行のサマリー（比較用）</h2>
+            <button className="close-x" onClick={() => setPreviousRun(null)}>✕</button>
+          </div>
+          <div className="status-grid">
+            <div className="stat"><div className="label">実施ラウンド数</div><div className="value small">{previousRun.round}</div></div>
+            <div className="stat"><div className="label">完成品累計</div><div className="value small">{previousRun.completedTotal}</div></div>
+            {[1,2,3,4].map(i => (
+              <div className="stat" key={i}>
+                <div className="label">{STATION_NAMES[i]} 効率</div>
+                <div className="value small">
+                  {previousRun.cumRoll[i] > 0 ? ((previousRun.cumProcessed[i] / previousRun.cumRoll[i]) * 100).toFixed(1) : '0.0'}%
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="panel">
+        <h2>ライン全体</h2>
+        <div className="line">
+          {stations.map((s, i) => (
+            <StationCard
+              key={i}
+              idx={i}
+              config={s}
+              wip={wip[i]}
+              lastRoll={lastRolls[i]}
+              lastProcessed={lastProcessed[i]}
+              cumProcessed={cumProcessed[i]}
+              cumRoll={cumRoll[i]}
+              round={round}
+              editMode={editMode}
+              onWipChange={updateWip}
+              onFaceChange={updateFace}
+              rolling={busy && animRolls != null}
+              animRoll={animRolls ? animRolls[i] : null}
+              flowFlash={flowFlash}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="grid2">
+        <div className="panel">
+          <h2>ラウンド履歴</h2>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>R</th>
+                  {STATION_NAMES.map(n => <th key={n}>{n}目</th>)}
+                  {STATION_NAMES.map(n => <th key={n}>{n}処理</th>)}
+                  <th>完成品</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.slice().reverse().map(h => (
+                  <tr key={h.round}>
+                    <td>{h.round}</td>
+                    {h.rolls.map((r, i) => <td key={i}>{r}</td>)}
+                    {h.processed.map((p, i) => <td key={i}>{p}</td>)}
+                    <td><b>{h.completed}</b></td>
+                  </tr>
+                ))}
+                {history.length === 0 && (
+                  <tr><td colSpan={STATION_COUNT * 2 + 2} style={{ color: 'var(--muted)' }}>まだ記録がありません</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="panel">
+          <h2>10ラウンドごとの達成状況（目標 {TARGET_PER_10}個）</h2>
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>区間</th><th>完成品数</th><th>判定</th></tr></thead>
+              <tbody>
+                {decadeBlocks.slice().reverse().map(b => (
+                  <tr key={b.from}>
+                    <td>{b.from}〜{b.to}</td>
+                    <td>{b.sum}{!b.full && ' (途中)'}</td>
+                    <td className={"achieve " + (b.sum >= TARGET_PER_10 ? 'ok' : 'ng')}>
+                      {b.sum >= TARGET_PER_10 ? '達成' : '未達'}
+                    </td>
+                  </tr>
+                ))}
+                {decadeBlocks.length === 0 && (
+                  <tr><td colSpan="3" style={{ color: 'var(--muted)' }}>まだ記録がありません</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid2">
+        <div className="panel">
+          <h2>完成品累計の推移</h2>
+          <LineChart series={cumulativeSeries} />
+        </div>
+        <div className="panel">
+          <h2>各工程WIPの推移（工程2〜5）</h2>
+          <LineChart series={wipSeries} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
